@@ -26,6 +26,8 @@ function parseCommand(): string
             'find-post' => 'searchPost',
             'delete-post'=> 'deletePost',
             'quiz' => 'quiz',
+            'init' => 'initDB',
+            'seed' => 'seedDB',
             default => 'handleHelp'
         };
 

@@ -6,6 +6,12 @@ require_once 'src/main.php';*/
 
 require __DIR__ . '/vendor/autoload.php';
 
-$result = main();
-
+try {
+    $result = main();
+} catch (PDOException $e) {
+    echo $e->getMessage();
+}
+catch (Exception $e){
+    echo handleError($e->getMessage());
+}
 echo $result;

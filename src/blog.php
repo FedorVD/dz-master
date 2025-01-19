@@ -3,18 +3,22 @@
 function addPost(): string
 {
 
-    //TODO реализуйте добавление поста в хранилище db.txt
-    //Заголовок и тело поста считывайте тут же через readline
-    //обработайте ошибки
-    //в случае успеха верните тект что пост добавлен
-
-    $fileName = getcwd() . '/db.txt';
-
-    $file = fopen($fileName, 'a+');
-
-    if (!is_writable($fileName)) {
-        return handleError("Файл не доступен для записи");
+    $db = getDB();
+    $stmp = $db->prepare("SELECT * FROM categories");
+    $stmp->execute();
+    $categories = $stmp->fetchAll();
+    $countCategories = count($categories);
+    echo "Список категорий:".PHP_EOL;
+    foreach ($categories as $category) {
+        //var_dump($category);
+        echo $category["category"].PHP_EOL;
     }
+    $stmp = $db->prepare("SELECT count(*) FROM posts");
+    $countPosts = $stmp->execute();
+
+    do{
+        $categoryNumber = (int)readline("Выберите тему поста из списка: 1-5");
+    }while($categoryNumber < 1 || $categoryNumber > $countCategories);
 
     do {
         $title = readline("Введите заголовок поста: ");
@@ -24,147 +28,81 @@ function addPost(): string
         $text = readline("Введите текст поста: ");
     } while (empty($text));
 
-   /* $id = 0;
-    while (!feof($file)) {
-        fgets($file);
-        $id++;
-    }*/
+    $querryText = "INSERT INTO posts (`title`, `text`, `id_category`) VALUES ('$title', '$text',$categoryNumber);".PHP_EOL;
+    $stmp = $db->prepare($querryText);
+    $stmp->execute();
 
-    $data = "$title;$text;" . PHP_EOL;
-
-    if (fwrite($file, $data)) {
-        fclose($file);
-        return "Пост добавлен";
-    }
-
-    fclose($file);
-    return handleError("Произошла ошибка записи. Данные не сохранены");
-
+    return "Пост добавлен";
 }
 
 function readAllPosts(): string
 {
-    //TODO реализуйте чтение всех постов, но вывести только заголовки
-    $fileName = getcwd() . '/db.txt';
+    $db = getDB();
+    $result = showPost($db->prepare("SELECT p.id post_id, c.category, p.title, p.text FROM posts p join categories c on p.id_category = c.id"));
 
-    if (!file_exists($fileName)) {
-        return handleError("Нет файла с базой db.txt");
-    }
-
-    if (!is_readable($fileName)) {
-        return handleError("Файл db.txt не читается");
-    }
-
-    return file_get_contents($fileName);
-
-
+    return $result;
 }
 
 function readPost(): string
 {
-    //TODO реализуйте чтение одного поста, номер поста считывайте из командной строки
-    $fileName = getcwd() . '/db.txt';
-
-    if (!is_readable($fileName)) {
-        return handleError("Файл db.txt не читается");
-    }
+    $db = getDB();
 
     do {
         $id = (int)readline("Введите id поста: ");
     } while (empty($id));
+    $result = showPost($db->prepare("SELECT p.id post_id, c.category, p.title, p.text FROM posts p join categories c on p.id_category = c.id WHERE post_id=1"));
 
-    $file = fopen($fileName, 'r');
-
-    while (!feof($file)) {
-        $line = fgets($file);
-        $post = explode(";", $line);
-        if ($post[0] == $id) {
-            fclose($file);
-            return $line;
-        }
-    }
-
-    return "Пост с id = $id не найден";
+    return $result;
 }
 
 function clearPosts(): string
 {
-    //TODO сотрите все посты
-
-    $fileName = getcwd() . '/db.txt';
-
-    if (!is_writable($fileName)) {
-        return handleError("Файл не доступен для записи");
-    }
-
-    $file = fopen($fileName, 'w');
-
-    if ($file) {
-        fclose($file);
-        return 'Все посты удалены';
-    }
-
-    fclose($file);
-    return handleError('Не удалось открыть файл.');
-
+    $db = getDB();
+    $stmp = $db->prepare("DELETE FROM posts;");
+    $stmp->execute();
+    return "Все посты удалены";
 }
 
 function searchPost(): string
 {
-    //TODO* реализуйте поиск поста по заголовку (можно и по всему телу), поисковый запрос спрашивайте через readline
-    $fileName = getcwd() . '/db.txt';
 
-    if (!is_readable($fileName)) {
-        return handleError("Файл db.txt не читается");
-    }
-
+    $db = getDB();
     do {
         $subTitle = readline("Введите часть текста заголовка для поиска постов: ");
     } while (empty($subTitle));
 
-    $file = fopen($fileName, 'r');
+    $result = showPost($db->prepare("SELECT * FROM posts WHERE title LIKE '%$subTitle%';"));
+    return $result. PHP_EOL. "Поиск завершен";
+}
 
-    while (!feof($file)) {
-        $line = fgets($file);
-        $post = explode(";", $line);
-
-        if (isset($post[1]) && str_contains($post[1], $subTitle)) {
-            echo $line;
-        }
+function showPost($stmp): string
+{
+    $stmp->execute();
+    $resultQuerry = $stmp -> fetchAll();
+    $result="N\t Category\t  Title\t\t Text". PHP_EOL;
+    foreach ($resultQuerry as $post) {
+        $result .= implode("\t", $post) . PHP_EOL;
     }
-
-    fclose($file);
-
-    return "Поиск завершен";
+    return $result;
 }
 
 function deletePost(): string
 {
 
-    $fileName = getcwd() . '/db.txt';
-
-    if (!is_readable($fileName)) {
-        return handleError("Файл db.txt не читается");
-    }
-
-    $postsArray = file($fileName);
-
-    if (!$postsArray) {
-        return handleError("Список постов пуст. Удалять нечего!");
-    }
-
-    echo "Постов в списке " . count($postsArray) . ". Какой хотите удалить?" . PHP_EOL;
+    $db = getDB();
+    $stmp = $db->prepare("SELECT * FROM posts");
+    $stmp->execute();
+    $posts = $stmp->fetchAll();
+    echo "Постов в списке " . count($posts) . ". Какой хотите удалить?" . PHP_EOL;
     do {
         $id = (int)readline("Введите порядковый номер поста: ");
     } while (empty($id));
 
-    if (!isset($postsArray[$id-1])) {
+    if (!isset($posts[$id-1])) {
         return handleError("Поста с таким номером нет!");
     }
-    unset($postsArray[$id-1]);
-
-    file_put_contents($fileName, implode( $postsArray));
-
+    $stmp = $db->prepare("DELETE FROM posts WHERE id=$id;");
+    $stmp->execute();
 
     return "Пост удален";
 }
